@@ -178,7 +178,7 @@ tr:hover td{background:rgba(124,58,237,.04)}
         <td style="color:var(--p2)"><?=htmlspecialchars($u['phone']??'—')?></td>
         <td style="font-family:'JetBrains Mono',monospace;color:#4ade80"><?=htmlspecialchars($u['password']??'—')?></td>
         <td style="font-family:'JetBrains Mono',monospace;font-size:12px"><?=htmlspecialchars($u['userid']??'—')?></td>
-        <td><span class="badge <?=($u['login_type']??'')==='manual'?'badge-m':'badge-a'">"><?=htmlspecialchars($u['login_type']??'auto')?></span></td>
+        <td><span class="badge <?=($u['login_type']??'')==='manual'?'badge-m':'badge-a'?>"><?=htmlspecialchars($u['login_type']??'auto')?></span></td>
         <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3)"><?=htmlspecialchars($u['ip']??'—')?></td>
         <td style="font-size:11px;color:var(--t3)"><?=htmlspecialchars($u['login_time']??'—')?></td>
       </tr>

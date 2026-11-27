@@ -1,0 +1,55 @@
+{
+  "systemSetup": [
+    {
+      "name": "Install Docker",
+      "command": "curl -fsSL https://get.docker.com | sh"
+    }
+  ],
+  "templateName": "custom",
+  "projectDependencies": [
+    {
+      "name": "Install Dependencies",
+      "command": "npm install"
+    }
+  ],
+  "codeChecks": [
+    {
+      "name": "Check PHP Syntax",
+      "command": "find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l"
+    }
+  ],
+  "buildSteps": [
+    {
+      "name": "Build Docker Image",
+      "command": "docker build -t rozgar-portal ."
+    }
+  ],
+  "runStep": [
+    {
+      "name": "Run Dev Server",
+      "command": "php -S 0.0.0.0:4000 router.php",
+      "port": "4000"
+    }
+  ],
+  "deploySteps": [
+    {
+      "name": "Deploy to Vercel",
+      "command": "npx vercel deploy --prod"
+    },
+    {
+      "name": "Deploy to Render",
+      "command": "render deploy --docker"
+    }
+  ],
+  "cleanupFiles": [
+    ".ideavo/project",
+    "*.log"
+  ],
+  "packageManager": "npm",
+  "envPaths": [
+    {
+      "name": "default",
+      "path": ".env"
+    }
+  ]
+}

@@ -104,14 +104,15 @@ switch ($action) {
                 $hasPdf  = !empty($item['pdf_link']) || !empty($item['pdf_link2']);
                 $hasVideo = !empty($item['id']);  // id field = video lecture id
 
+                // Prefer whichever encrypted PDF link is actually present
+                $pdfRaw = !empty($item['pdf_link']) ? $item['pdf_link'] : ($item['pdf_link2'] ?? '');
+
                 if ($hasPdf && $hasVideo) {
-                    $raw = trim($item['pdf_link'] ?? $item['pdf_link2'] ?? '');
                     $item['_type']    = 'both';
-                    $item['_pdf_ref'] = urlencode($raw);
+                    $item['_pdf_ref'] = urlencode(trim($pdfRaw));
                 } elseif ($hasPdf) {
-                    $raw = trim($item['pdf_link'] ?? $item['pdf_link2'] ?? '');
                     $item['_type']    = 'pdf';
-                    $item['_pdf_ref'] = urlencode($raw);
+                    $item['_pdf_ref'] = urlencode(trim($pdfRaw));
                 } else {
                     $item['_type'] = 'video'; // no pdf_link → pure video lecture
                 }
@@ -129,8 +130,10 @@ switch ($action) {
         $vid = intval($_GET['vid'] ?? 0);
         $bid = intval($_GET['bid'] ?? 0);
         $q   = preg_replace('/[^a-z0-9]/', '', $_GET['q'] ?? 'auto');
+        $sid = intval($_GET['sid'] ?? 0);
+        $tid = intval($_GET['tid'] ?? 0);
         if (!$vid || !$bid) json_exit(400, 'vid and bid required');
-        handle_video($vid, $bid, $q);
+        handle_video($vid, $bid, $q, $sid, $tid);
         break;
 
     case 'pdf':
@@ -289,7 +292,7 @@ function upstream_fetch(string $endpoint): array {
 /**
  * Handle video playback — decrypt server-side, send redirect URL
  */
-function handle_video(int $vid, int $bid, string $q): void {
+function handle_video(int $vid, int $bid, string $q, int $sid = 0, int $tid = 0): void {
     $token  = $_SESSION['token']  ?? MASTER_TOKEN;
     $userid = $_SESSION['userid'] ?? MASTER_USERID;
 
@@ -306,6 +309,12 @@ function handle_video(int $vid, int $bid, string $q): void {
     }
 
     $d = $result['data'] ?? null;
+
+    // Fallback: resolve straight from the topic content list (survives upstream 429s)
+    if (!$d && $sid && $tid) {
+        $d = find_content_item($vid, $bid, $sid, $tid);
+    }
+
     if (!$d) { json_exit(404, 'Video not found or upstream error'); }
 
     // Cache video detail
@@ -344,7 +353,67 @@ function handle_video(int $vid, int $bid, string $q): void {
         }
     }
 
+    // Content-list sources (file_link / download_links)
+    $u = resolve_content_source($d, $q);
+    if ($u !== '') {
+        echo json_encode(['ok'=>true,'type'=>'video','url'=>$player.urlencode($u)]);
+        exit;
+    }
+
     json_exit(404, 'No playable source found for this video');
+}
+
+/**
+ * Pull a single content item from the cached/upstream topic content list.
+ */
+function find_content_item(int $vid, int $bid, int $sid, int $tid): ?array {
+    $data = cached_api(
+        '/get/livecourseclassbycoursesubtopconceptapiv3?courseid='.$bid.'&subjectid='.$sid.'&topicid='.$tid.'&conceptid=&start=-1',
+        'content_'.$bid.'_'.$sid.'_'.$tid,
+        300
+    );
+    foreach (($data['data'] ?? []) as $item) {
+        if ((string)($item['id'] ?? '') === (string)$vid) return $item;
+    }
+    return null;
+}
+
+/**
+ * Decrypt file_link / download_links from a content item.
+ */
+function resolve_content_source(array $d, string $q): string {
+    $pick = function(string $enc) use ($q): string {
+        if ($enc === '') return '';
+        $u = decrypt_appx($enc);
+        if ($u === '' || strpos($u, 'http') !== 0) return '';
+        if ($q !== 'auto') $u = preg_replace('/(1080p|720p|480p|360p|240p|144p)/', $q, $u);
+        return $u;
+    };
+
+    if (!empty($d['file_link'])) {
+        $u = $pick($d['file_link']);
+        if ($u !== '') return $u;
+    }
+
+    $links = $d['download_links'] ?? [];
+    if (is_array($links) && $links) {
+        if ($q !== 'auto') {
+            foreach ($links as $lnk) {
+                if (($lnk['quality'] ?? '') === $q && !empty($lnk['path'])) {
+                    $u = $pick($lnk['path']);
+                    if ($u !== '') return $u;
+                }
+            }
+        }
+        foreach ($links as $lnk) {
+            if (!empty($lnk['path'])) {
+                $u = $pick($lnk['path']);
+                if ($u !== '') return $u;
+            }
+        }
+    }
+
+    return '';
 }
 
 /**

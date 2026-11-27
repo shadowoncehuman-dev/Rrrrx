@@ -15,7 +15,11 @@ function supported_media_url(string $url): bool {
     }
 
     $host = strtolower(rtrim($parts['host'], '.'));
-    foreach (['appx.co.in', 'classx.co.in', 'teachx.in'] as $domain) {
+    foreach ([
+        'appx.co.in', 'classx.co.in', 'teachx.in', 'kaxa.in',
+        'akamai.net.in', 'akamaized.net', 'cloudfront.net',
+        'amazonaws.com', 'googleapis.com', 'googlevideo.com',
+    ] as $domain) {
         if ($host === $domain || str_ends_with($host, '.'.$domain)) {
             return true;
         }
@@ -132,7 +136,11 @@ function proxy_media(string $url): void {
         exit;
     }
 
-    $requestHeaders = ['Accept: */*'];
+    $requestHeaders = [
+        'Accept: */*',
+        'Referer: https://www.rozgarapinew.teachx.in/',
+        'Origin: https://www.rozgarapinew.teachx.in',
+    ];
     $range = $_SERVER['HTTP_RANGE'] ?? '';
     if (is_string($range) && preg_match('/^bytes=(?:\d+-\d*|-\d+)(?:,(?:\d+-\d*|-\d+))*$/D', $range)) {
         $requestHeaders[] = 'Range: '.$range;
@@ -270,11 +278,12 @@ if($mediaUrl !== '' || ($_GET['stream'] ?? '') === '1'){
 <title>Video Player</title>
 <style>
 *{box-sizing:border-box}
-html,body{width:100%;height:100%;margin:0;background:#08080d;color:#f1f5f9;font-family:system-ui,sans-serif}
+:root{--brand:#6366f1;--brand-2:#8b5cf6;--bg:#070a16}
+html,body{width:100%;height:100%;margin:0;background:var(--bg);color:#f1f5f9;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
 body{display:grid;place-items:center}
-main{width:min(100%,1000px);padding:16px}
-video{display:block;width:100%;max-height:calc(100dvh - 32px);background:#000;border-radius:12px}
-#error{color:#fca5a5;text-align:center;padding:12px}
+main{width:min(100%,900px);padding:16px}
+video{display:block;width:100%;max-height:calc(100dvh - 32px);background:#000;border-radius:16px;box-shadow:0 20px 60px -30px rgba(0,0,0,.9)}
+#error{color:#f87171;text-align:center;padding:14px;font-size:13px}
 </style>
 </head>
 <body>
@@ -376,5 +385,12 @@ foreach($lnks as $lnk){
         if($q!=='auto') $u=preg_replace('/(1080p|720p|480p|360p|240p)/',$q,$u);
         if($u){header('Location: '.$player.urlencode($u));exit;}
     }
+}
+// Content-list sources (file_link / download_links)
+foreach([$d['file_link']??''] as $enc){
+    if($enc){$u=decrypt_appx($enc); if($u){header('Location: '.$player.urlencode($u));exit;}}
+}
+foreach(($d['download_links']??[]) as $lnk){
+    if(!empty($lnk['path'])){$u=decrypt_appx($lnk['path']); if($u){header('Location: '.$player.urlencode($u));exit;}}
 }
 http_response_code(404); die('No playable source');
