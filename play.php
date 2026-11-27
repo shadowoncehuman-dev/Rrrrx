@@ -79,7 +79,39 @@ function proxy_playlist_uri(string $playlistUrl, string $uri): string {
     if (!is_string($endpoint) || $endpoint === '') {
         $endpoint = $_SERVER['SCRIPT_NAME'] ?? '/play.php';
     }
-    return $endpoint.'?stream=1&url='.rawurlencode($resolved);
+    $url = $endpoint.'?stream=1&url='.rawurlencode($resolved);
+    $keyB64 = current_stream_key_b64();
+    if ($keyB64 !== '') {
+        $url .= '&key='.rawurlencode($keyB64);
+    }
+    return $url;
+}
+
+/**
+ * Stream key (AES-128) supplied by the API, base64-encoded in the query.
+ */
+function current_stream_key_b64(): string {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    $cached = '';
+    $raw = $_GET['key'] ?? '';
+    if (is_string($raw) && $raw !== '') {
+        $bin = base64_decode(strtr($raw, '-_', '+/'), true);
+        if ($bin !== false && strlen($bin) === 16) {
+            $cached = base64_encode($bin);
+        }
+    }
+    return $cached;
+}
+
+function stream_key_endpoint(): string {
+    $endpoint = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    if (!is_string($endpoint) || $endpoint === '') {
+        $endpoint = $_SERVER['SCRIPT_NAME'] ?? '/play.php';
+    }
+    return $endpoint.'?key=1&k='.rawurlencode(current_stream_key_b64());
 }
 
 function rewrite_media_playlist(string $playlist, string $playlistUrl): string {
@@ -88,11 +120,20 @@ function rewrite_media_playlist(string $playlist, string $playlistUrl): string {
         return $playlist;
     }
 
+    $keyB64 = current_stream_key_b64();
     foreach ($lines as $index => $line) {
         if ($index % 2 === 1 || $line === '') {
             continue;
         }
         if (str_starts_with($line, '#')) {
+            if ($keyB64 !== '' && stripos($line, '#EXT-X-KEY') === 0 && stripos($line, 'METHOD=NONE') === false) {
+                $lines[$index] = preg_replace(
+                    '/(\bURI\s*=\s*")[^"]*(")/i',
+                    '${1}'.stream_key_endpoint().'${2}',
+                    $line
+                ) ?? $line;
+                continue;
+            }
             $lines[$index] = preg_replace_callback(
                 '/(\bURI\s*=\s*")([^"]+)(")/i',
                 static fn(array $match): string => $match[1].proxy_playlist_uri($playlistUrl, $match[2]).$match[3],
@@ -241,6 +282,20 @@ function proxy_media(string $url): void {
         }
         exit;
     }
+}
+
+// Serve the AES-128 stream key to the local player (same-origin).
+if (($_GET['key'] ?? '') === '1') {
+    $bin = base64_decode(strtr((string)($_GET['k'] ?? ''), '-_', '+/'), true);
+    if ($bin === false || strlen($bin) !== 16) {
+        http_response_code(400);
+        exit;
+    }
+    header('Content-Type: application/octet-stream');
+    header('Content-Length: 16');
+    header('Cache-Control: private, max-age=300');
+    echo $bin;
+    exit;
 }
 
 $mediaUrl = $_GET['url'] ?? '';

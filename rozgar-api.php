@@ -324,43 +324,100 @@ function handle_video(int $vid, int $bid, string $q, int $sid = 0, int $tid = 0)
     $player = '/player?url=';
 
     // YouTube
-    if (!empty($d['video_id']) && empty($d['download_link'])) {
+    if (!empty($d['video_id']) && empty($d['download_link']) && empty($d['file_link'])) {
         $yt = strlen($d['video_id']) > 20 ? decrypt_appx($d['video_id']) : $d['video_id'];
         echo json_encode(['ok'=>true,'type'=>'youtube','url'=>'https://www.youtube.com/watch?v='.urlencode($yt)]);
         exit;
     }
 
-    // Direct download_link (AES encrypted)
-    if (!empty($d['download_link'])) {
-        $u = decrypt_appx($d['download_link']);
-        if ($q !== 'auto') $u = preg_replace('/(1080p|720p|480p|360p|240p)/', $q, $u);
-        echo json_encode(['ok'=>true,'type'=>'video','url'=>$player.urlencode($u)]);
-        exit;
-    }
+    $applyQ = function(string $u) use ($q): string {
+        if ($u !== '' && $q !== 'auto') $u = preg_replace('/(1080p|720p|480p|360p|240p|144p)/', $q, $u);
+        return $u;
+    };
 
-    // encrypted_links array
-    $lnks = $d['encrypted_links'] ?? [];
-    if (!empty($lnks)) {
-        foreach ($lnks as $lnk) {
-            if (!empty($lnk['path'])) {
-                $u = decrypt_appx($lnk['path']);
-                if ($u) {
-                    if ($q !== 'auto') $u = preg_replace('/(1080p|720p|480p|360p|240p)/', $q, $u);
-                    echo json_encode(['ok'=>true,'type'=>'video','url'=>$player.urlencode($u)]);
-                    exit;
+    // Build playable candidates in preference order: [url, keySuffix]
+    $cands = [];
+    if (!empty($d['download_link'])) {
+        $u = $applyQ(decrypt_appx($d['download_link']));
+        if ($u) $cands[] = [$u, stream_key_param($d['video_key'] ?? '')];
+    }
+    foreach (($d['encrypted_links'] ?? []) as $lnk) {
+        if (!empty($lnk['path'])) {
+            $u = $applyQ(decrypt_appx($lnk['path']));
+            if ($u) $cands[] = [$u, stream_key_param($lnk['key'] ?? '')];
+        }
+    }
+    // Direct MP4 file — often the only source still present on the CDN.
+    if (!empty($d['file_link'])) {
+        $u = $applyQ(decrypt_appx($d['file_link']));
+        if ($u) $cands[] = [$u, ''];
+    }
+    $links = $d['download_links'] ?? [];
+    if (is_array($links) && $links) {
+        if ($q !== 'auto') {
+            foreach ($links as $lnk) {
+                if (($lnk['quality'] ?? '') === $q && !empty($lnk['path'])) {
+                    $u = $applyQ(decrypt_appx($lnk['path']));
+                    if ($u) $cands[] = [$u, ''];
                 }
+            }
+        }
+        foreach ($links as $lnk) {
+            if (!empty($lnk['path'])) {
+                $u = $applyQ(decrypt_appx($lnk['path']));
+                if ($u) $cands[] = [$u, ''];
             }
         }
     }
 
-    // Content-list sources (file_link / download_links)
-    $u = resolve_content_source($d, $q);
-    if ($u !== '') {
-        echo json_encode(['ok'=>true,'type'=>'video','url'=>$player.urlencode($u)]);
-        exit;
+    if (!$cands) { json_exit(404, 'No playable source found for this video'); }
+
+    // Return the first source the CDN actually serves (dead HLS masters are common).
+    $chosen = $cands[0];
+    foreach ($cands as $cand) {
+        if (media_reachable($cand[0])) { $chosen = $cand; break; }
     }
 
-    json_exit(404, 'No playable source found for this video');
+    echo json_encode(['ok'=>true,'type'=>'video','url'=>$player.urlencode($chosen[0]).$chosen[1]]);
+    exit;
+}
+
+/**
+ * Quick reachability probe so we can skip dead CDN sources.
+ */
+function media_reachable(string $url): bool {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS      => 3,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_TIMEOUT        => 6,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_RANGE          => '0-1',
+        CURLOPT_ENCODING       => '',
+        CURLOPT_HTTPHEADER     => [
+            'User-Agent: Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36',
+            'Referer: https://www.rozgarapinew.teachx.in/',
+        ],
+    ]);
+    curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return $code >= 200 && $code < 400;
+}
+
+/**
+ * Build the `&key=` suffix for the player from an encrypted stream key.
+ * key -> decrypt (AES) -> base64-decode -> 16 raw bytes -> base64 for transport.
+ */
+function stream_key_param(string $encKey): string {
+    if ($encKey === '') return '';
+    $k1 = decrypt_appx($encKey);
+    if ($k1 === '') return '';
+    $bin = base64_decode($k1, true);
+    if ($bin === false || strlen($bin) !== 16) return '';
+    return '&key=' . urlencode(base64_encode($bin));
 }
 
 /**
@@ -421,17 +478,24 @@ function resolve_content_source(array $d, string $q): string {
  */
 function handle_pdf(string $enc): void {
     $viewer = '/pdf-viewer?url=';
-    $raw = urldecode($enc);
 
-    if (strpos($raw, 'http') === 0) {
-        echo json_encode(['ok'=>true,'type'=>'pdf','url'=>$viewer.urlencode($raw)]);
-        exit;
+    // The link may arrive raw, url-encoded, or double-encoded depending on caller.
+    $candidates = [urldecode($enc), $enc];
+    foreach ($candidates as $raw) {
+        $raw = trim($raw);
+        if ($raw === '') continue;
+
+        if (strpos($raw, 'http') === 0) {
+            echo json_encode(['ok'=>true,'type'=>'pdf','url'=>$viewer.urlencode($raw)]);
+            exit;
+        }
+
+        $u = decrypt_appx($raw);
+        if (!empty($u) && strpos($u, 'http') === 0) {
+            echo json_encode(['ok'=>true,'type'=>'pdf','url'=>$viewer.urlencode($u)]);
+            exit;
+        }
     }
 
-    $u = decrypt_appx($raw);
-    if (empty($u)) {
-        json_exit(400, 'Could not decrypt PDF link');
-    }
-
-    echo json_encode(['ok'=>true,'type'=>'pdf','url'=>$viewer.urlencode($u)]);
+    json_exit(400, 'Could not decrypt PDF link');
 }
